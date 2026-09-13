@@ -1,16 +1,12 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 @Component({
   imports: [RouterOutlet],
   selector: 'app-root',
-  styles: [],
+  styles: [`:host{display:block;min-height:100dvh;background:var(--surface-page);color:var(--text-primary)}`],
   template: `
-    <h1>Hello, {{ title() }}</h1>
-
     <router-outlet />
   `,
 })
-export class App {
-  protected readonly title = signal('meno_admin');
-}
+export class App {}
