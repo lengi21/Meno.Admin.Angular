@@ -13,6 +13,8 @@ export const routes: Routes = [
     { path: 'menus', loadComponent: () => import('./features/menus/menus.component').then((m) => m.MenusComponent) },
     { path: 'categories', loadComponent: () => import('./features/categories/categories.component').then((m) => m.CategoriesComponent) },
     { path: 'dishes', loadComponent: () => import('./features/dishes/dishes.component').then((m) => m.DishesComponent) },
+    { path: 'analytics', loadComponent: () => import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent) },
+    { path: 'audit', loadComponent: () => import('./features/audit/audit.component').then((m) => m.AuditComponent) },
     { path: '', pathMatch: 'full', redirectTo: 'settings' },
   ] },
   { path: '**', redirectTo: 'sign-in' },
