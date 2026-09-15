@@ -7,7 +7,7 @@ import { DataTableComponent } from '../../shared/data-table/data-table.component
 @Component({
   selector: 'app-staff',
   imports: [MatIconModule, FormsModule, DataTableComponent, BottomSheetComponent],
-  template: `<main class="page">
+  template: `<main class="page list-page">
     <section class="heading">
       <div>
         <h1>პერსონალი & PIN-ები</h1>
@@ -198,6 +198,7 @@ export class StaffComponent {
     this.api.resetPin(id).subscribe();
   }
 }
+
 
 
 

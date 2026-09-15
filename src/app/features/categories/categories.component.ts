@@ -12,7 +12,7 @@ import { DataTableComponent } from '../../shared/data-table/data-table.component
 @Component({
   selector: 'app-categories', imports: [FormsModule, MatIconModule, TranslatePipe, BottomSheetComponent, CatalogImageComponent, DataTableComponent],
   template: `
-    <main class="page">
+    <main class="page list-page">
       <section class="heading"><div><h1>{{ 'NAV.CATEGORIES' | translate }}</h1><p>{{ filtered().length }} {{ language.current()==='ka' ? 'კატეგორია' : 'categories' }}</p></div><button class="add" type="button" (click)="openCreate()"><mat-icon>add</mat-icon>{{ language.current()==='ka' ? 'კატეგორიის დამატება' : 'Add category' }}</button></section>
       <app-data-table><section data-table-filters class="filters"><label><mat-icon>search</mat-icon><input [(ngModel)]="search" [placeholder]="language.current()==='ka' ? 'ძიება...' : 'Search...'"></label><select [(ngModel)]="statusFilter"><option value="ALL">{{ language.current()==='ka' ? 'ყველა სტატუსი' : 'All statuses' }}</option><option value="AVAILABLE">{{ 'COMMON.ACTIVE' | translate }}</option><option value="PAUSED">{{ 'COMMON.PAUSED' | translate }}</option><option value="HIDDEN">{{ language.current()==='ka' ? 'დამალული' : 'Hidden' }}</option></select></section>
       <section data-table-rows class="table-shell"><div class="table-head"><span>{{ language.current()==='ka' ? 'კატეგორია' : 'Category' }}</span><span>{{ language.current()==='ka' ? 'სტატუსი' : 'Status' }}</span><span>{{ language.current()==='ka' ? 'მენიუები' : 'Menus' }}</span><span>{{ language.current()==='ka' ? 'კერძები' : 'Dishes' }}</span><span>{{ language.current()==='ka' ? 'პოზიცია' : 'Position' }}</span><span></span></div>@for(category of filtered();track category.id){<article><div class="category"><app-catalog-image [src]="category.imageUrl" [alt]="name(category)"/><span><strong>{{name(category)}}</strong><small>{{englishName(category)}}</small></span></div><span><b class="status" [class.paused]="category.status==='PAUSED'" [class.hidden]="category.status==='HIDDEN'">{{ statusName(category.status) }}</b></span><span class="metric"><mat-icon>layers</mat-icon>{{ menuCount(category.id) }}</span><span class="metric"><mat-icon>restaurant</mat-icon>{{ dishCount(category.id) }}</span><span>#{{category.sortOrder}}</span><button class="actions" type="button" (click)="openEdit(category)"><mat-icon>more_vert</mat-icon></button></article>}@empty{<div class="empty">{{ language.current()==='ka' ? 'კატეგორიები ვერ მოიძებნა' : 'No categories found' }}</div>}</section></app-data-table>
@@ -37,6 +37,7 @@ export class CategoriesComponent {
   statusName(status: Category['status']) { return status === 'AVAILABLE' ? (this.language.current() === 'ka' ? 'აქტიური' : 'Active') : status === 'PAUSED' ? (this.language.current() === 'ka' ? 'შეჩერებული' : 'Paused') : (this.language.current() === 'ka' ? 'დამალული' : 'Hidden'); }
   private translation(category: Category, languageCode: string) { return category.translations.find(item => item.languageCode === languageCode)?.name ?? ''; }
 }
+
 
 
 
