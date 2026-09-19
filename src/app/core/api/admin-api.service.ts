@@ -11,6 +11,9 @@ export interface Staff { id: string; firstName: string; lastName: string; email:
 export interface PinDelivery { type: 'email' | 'sms'; destination: string; }
 export interface PinResult { staff?: Staff; staffId?: string; generatedPin: string; mockDelivery: PinDelivery; }
 export interface Menu { id: string; status: 'ACTIVE'|'PAUSED'|'DELETED'; purpose: 'POS'|'QR'; isSystem: boolean; isDefault: boolean; translations: { languageCode: string; name: string; description?: string }[]; _count?: { categories: number; dishes: number }; }
+export interface MenuCategoryItem { categoryId: string; sortOrder: number; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; category?: Category; }
+export interface MenuDishItem { dishId: string; sortOrder: number; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; priceOverride: string | number | null; dish?: Dish; }
+export interface MenuStructure { id: string; categories: MenuCategoryItem[]; dishes: MenuDishItem[]; }
 export interface CatalogTranslations { ka: { name: string; description?: string; recipe?: string }; en: { name: string; description?: string; recipe?: string }; ru: { name: string; description?: string; recipe?: string }; }
 export interface Category { id: string; imageUrl: string | null; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; sortOrder: number; translations: { languageCode: string; name: string }[]; }
 export interface Dish { id: string; categoryId: string; imageUrl: string | null; priceAmount: string|number; calories: number|null; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; translations: { languageCode: string; name: string; description: string; recipe?: string }[]; category?: Category; }
@@ -35,7 +38,7 @@ export class AdminApiService {
   deleteRole(roleId: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/admin/roles/${roleId}`, { headers: this.headers() }); }
   getMenus(): Observable<Menu[]> { return this.http.get<Menu[]>(`${this.baseUrl}/admin/catalog/menus`, { headers: this.headers() }); }
   createMenu(value: { translations: Record<string, { name: string; description?: string }>; status?: string; isDefault?: boolean }): Observable<Menu> { return this.http.post<Menu>(`${this.baseUrl}/admin/catalog/menus`, value, { headers: this.headers() }); }
-  getMenuStructure(id: string): Observable<{ id: string; categories: { categoryId: string; sortOrder: number; status: string }[]; dishes: { dishId: string; sortOrder: number; status: string; priceOverride: string | number | null }[] }> { return this.http.get<any>(`${this.baseUrl}/admin/catalog/menus/${id}/structure`, { headers: this.headers() }); }
+  getMenuStructure(id: string): Observable<MenuStructure> { return this.http.get<MenuStructure>(`${this.baseUrl}/admin/catalog/menus/${id}/structure`, { headers: this.headers() }); }
   saveMenuCategories(id: string, items: { categoryId: string; sortOrder: number; status?: string }[]): Observable<unknown> { return this.http.put(`${this.baseUrl}/admin/catalog/menus/${id}/categories`, { items }, { headers: this.headers() }); }
   saveMenuDishes(id: string, items: { dishId: string; sortOrder: number; status?: string; priceOverride?: number | null }[]): Observable<unknown> { return this.http.put(`${this.baseUrl}/admin/catalog/menus/${id}/dishes`, { items }, { headers: this.headers() }); }
   getCategories(): Observable<Category[]> { return this.http.get<Category[]>(`${this.baseUrl}/admin/catalog/categories`, { headers: this.headers() }); }
