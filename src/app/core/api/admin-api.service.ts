@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -18,6 +18,14 @@ export interface CatalogTranslations { ka: { name: string; description?: string;
 export interface Category { id: string; imageUrl: string | null; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; sortOrder: number; translations: { languageCode: string; name: string }[]; }
 export interface Dish { id: string; categoryId: string; imageUrl: string | null; priceAmount: string|number; calories: number|null; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; translations: { languageCode: string; name: string; description: string; recipe?: string }[]; category?: Category; }
 export interface DishPage { items: Dish[]; page: number; pageSize: number; total: number; }
+
+export type ChequeAnalyticsSortKey = 'openedAt' | 'chequeNumber' | 'owner' | 'hall' | 'table' | 'amount' | 'discountPercent' | 'total' | 'payment' | 'clientPaid' | 'closedAt';
+export type ChequeAnalyticsSort = { readonly key: ChequeAnalyticsSortKey; readonly direction: 'asc' | 'desc' };
+export interface ChequeAnalyticsQuery { readonly page?: number; readonly pageSize?: number; readonly query?: string; readonly status?: string; readonly from?: string; readonly to?: string; readonly hallId?: string; readonly tableId?: string; readonly ownerId?: string; readonly payment?: string; readonly sort?: readonly ChequeAnalyticsSort[]; }
+export interface ChequeAnalyticsRow { readonly id: string; readonly openedAt: string; readonly chequeNumber: number; readonly owner: { readonly name: string }; readonly hallName: string; readonly tableName: string; readonly amountBeforeDiscount: number; readonly discountPercent: number; readonly totalAmount: number; readonly paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'SPLIT' | '—'; readonly clientPaidAmount: number; readonly closedAt: string | null; readonly status: string; }
+export interface ChequeAnalyticsPage { readonly items: readonly ChequeAnalyticsRow[]; readonly page: number; readonly pageSize: number; readonly total: number; readonly pages: number; }
+export interface ChequeAnalyticsFilters { readonly halls: readonly { readonly id: string; readonly name: string; readonly tables: readonly { readonly id: string; readonly name: string }[] }[]; readonly staff: readonly { readonly id: string; readonly name: string }[]; }
+export interface AdvanceChequeSnapshot { readonly available: boolean; readonly chequeNumber: number; readonly printedAt?: string; readonly receipt?: { readonly restaurantName: string; readonly hallName: string; readonly tableName: string; readonly chequeNumber: number; readonly language: 'ka' | 'en' | 'ru'; readonly total: number; readonly items: readonly { readonly name: string; readonly quantity: number; readonly unitPrice: number }[]; }; }
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -48,5 +56,16 @@ export class AdminApiService {
   getDishes(page=1,pageSize=20,search=''):Observable<DishPage>{return this.http.get<DishPage>(`${this.baseUrl}/admin/catalog/dishes`,{headers:this.headers(),params:{page,pageSize,search}});}
   createDish(value: { categoryId:string; translations:CatalogTranslations; imageUrl?:string; priceAmount:number; calories?:number; status?:string }):Observable<Dish>{return this.http.post<Dish>(`${this.baseUrl}/admin/catalog/dishes`,value,{headers:this.headers()});}
   uploadImage(file:File):Observable<{url:string}>{const data=new FormData();data.append('file',file);return this.http.post<{url:string}>(`${this.baseUrl}/admin/uploads`,data,{headers:this.headers()});}
+  getChequeAnalytics(query: ChequeAnalyticsQuery): Observable<ChequeAnalyticsPage> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (key === 'sort') continue;
+      if (value !== undefined && value !== '') params = params.set(key, String(value));
+    }
+    if (query.sort?.length) params = params.set('sort', query.sort.map((sort) => `${sort.key}:${sort.direction}`).join(','));
+    return this.http.get<ChequeAnalyticsPage>(`${this.baseUrl}/admin/analytics/cheques`, { headers: this.headers(), params });
+  }
+  getChequeAnalyticsFilters(): Observable<ChequeAnalyticsFilters> { return this.http.get<ChequeAnalyticsFilters>(`${this.baseUrl}/admin/analytics/cheques/filters`, { headers: this.headers() }); }
+  getAdvanceChequeSnapshot(chequeId: string): Observable<AdvanceChequeSnapshot> { return this.http.get<AdvanceChequeSnapshot>(`${this.baseUrl}/admin/analytics/cheques/${chequeId}/advance-receipt`, { headers: this.headers() }); }
   private headers(): HttpHeaders { return new HttpHeaders({ Authorization: `Bearer ${this.auth.session()?.accessToken ?? ''}` }); }
 }
