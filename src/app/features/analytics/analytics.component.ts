@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { DataTableComponent } from '../../shared/data-table/data-table.component';
@@ -12,6 +12,7 @@ const EMPTY_PAGE: ChequeAnalyticsPage = { items: [], page: 1, pageSize: 25, tota
 
 @Component({
   selector: 'app-analytics',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, MatIconModule, DataTableComponent, BottomSheetComponent, AdvanceChequePreviewComponent],
   template: `
     <main class="page list-page analytics-page">
@@ -28,7 +29,7 @@ const EMPTY_PAGE: ChequeAnalyticsPage = { items: [], page: 1, pageSize: 25, tota
           <select [(ngModel)]="ownerId" (ngModelChange)="load(1)"><option value="">{{ georgian() ? 'ყველა გამხსნელი' : 'All owners' }}</option>@for (member of filters().staff; track member.id) { <option [value]="member.id">{{ member.name }}</option> }</select>
           <select [(ngModel)]="payment" (ngModelChange)="load(1)"><option value="">{{ georgian() ? 'ყველა გადახდა' : 'All payments' }}</option><option value="CASH">{{ georgian() ? 'ნაღდი' : 'Cash' }}</option><option value="CARD">{{ georgian() ? 'ბარათი' : 'Card' }}</option><option value="TRANSFER">{{ georgian() ? 'გადარიცხვა' : 'Transfer' }}</option><option value="SPLIT">{{ georgian() ? 'გაყოფილი' : 'Split' }}</option></select>
         </section>
-        <section data-table-rows class="table-shell">
+        <section #tableRows data-table-rows class="table-shell">
           <div class="table-head">
             <button type="button" (click)="toggleSort('openedAt', $event.shiftKey)">{{ georgian() ? 'გახსნის დრო' : 'Opened' }} <mat-icon>{{ sortIcon('openedAt') }}</mat-icon></button>
             <button type="button" (click)="toggleSort('chequeNumber', $event.shiftKey)">{{ georgian() ? 'ჩეკი' : 'Cheque' }} <mat-icon>{{ sortIcon('chequeNumber') }}</mat-icon></button>
@@ -78,6 +79,7 @@ export class AnalyticsComponent {
   readonly page = signal<ChequeAnalyticsPage>(EMPTY_PAGE);
   readonly filters = signal<ChequeAnalyticsFilters>(EMPTY_FILTERS);
   readonly loading = signal(true);
+  readonly refreshing = signal(false);
   readonly error = signal(false);
   readonly sorts = signal<readonly ChequeAnalyticsSort[]>([{ key: 'openedAt', direction: 'desc' }]);
   readonly receiptOpen = signal(false);
@@ -85,18 +87,75 @@ export class AnalyticsComponent {
   readonly snapshot = signal<AdvanceChequeSnapshot | null>(null);
   readonly receiptTitle = signal('Advance cheque');
   private readonly destroyRef = inject(DestroyRef);
+  private readonly tableRows = viewChild<ElementRef<HTMLElement>>('tableRows');
+  private requestSequence = 0;
   readonly georgian = computed(() => this.language.current() === 'ka');
   readonly filteredTables = computed(() => this.hallId ? this.filters().halls.find((hall) => hall.id === this.hallId)?.tables ?? [] : this.filters().halls.flatMap((hall) => hall.tables));
   query = ''; from = ''; to = ''; status = 'ALL'; businessDayId = ''; hallId = ''; tableId = ''; ownerId = ''; payment = '';
 
-  constructor() { this.api.getChequeAnalyticsFilters().subscribe({ next: (filters) => { this.filters.set(filters); this.businessDayId = filters.defaultBusinessDayId ?? ''; this.load(1); }, error: () => this.load(1) }); const timer = window.setInterval(() => this.load(), 15000); this.destroyRef.onDestroy(() => window.clearInterval(timer)); }
+  constructor() {
+    this.api.getChequeAnalyticsFilters().subscribe({
+      next: (filters) => { this.filters.set(filters); this.businessDayId = filters.defaultBusinessDayId ?? ''; this.load(1); },
+      error: () => this.load(1),
+    });
+    const timer = window.setInterval(() => this.refresh(), 15000);
+    this.destroyRef.onDestroy(() => window.clearInterval(timer));
+  }
 
-  load(targetPage = this.page().page): void {
+  /** A user-triggered query deliberately shows loading; the background poll never replaces the current rows. */
+  load(targetPage = this.page().page): void { this.fetch(targetPage, false); }
+
+  private refresh(): void {
+    if (this.loading() || this.refreshing()) return;
+    this.fetch(this.page().page, true);
+  }
+
+  private fetch(targetPage: number, silent: boolean): void {
     if (targetPage < 1) return;
-    this.loading.set(true); this.error.set(false);
+    const request = ++this.requestSequence;
+    const scrollPosition = silent ? this.scrollPosition() : null;
+    if (silent) this.refreshing.set(true);
+    else { this.refreshing.set(false); this.loading.set(true); this.error.set(false); }
+
     this.api.getChequeAnalytics({ page: targetPage, pageSize: 25, query: this.query, status: this.status, businessDayId: this.businessDayId, from: this.from, to: this.to, hallId: this.hallId, tableId: this.tableId, ownerId: this.ownerId, payment: this.payment, sort: this.sorts() }).subscribe({
-      next: (page) => { this.page.set(page); this.loading.set(false); },
-      error: () => { this.loading.set(false); this.error.set(true); },
+      next: (incoming) => {
+        if (request !== this.requestSequence) return;
+        this.page.update((current) => this.reconcilePage(current, incoming));
+        this.loading.set(false); this.refreshing.set(false);
+        if (scrollPosition) this.restoreScrollPosition(scrollPosition);
+      },
+      error: () => {
+        if (request !== this.requestSequence) return;
+        this.refreshing.set(false);
+        if (!silent) { this.loading.set(false); this.error.set(true); }
+      },
+    });
+  }
+
+  /** Keeps unchanged object references, so Angular updates only cheque rows whose values actually changed. */
+  private reconcilePage(current: ChequeAnalyticsPage, incoming: ChequeAnalyticsPage): ChequeAnalyticsPage {
+    const existing = new Map(current.items.map((row) => [row.id, row]));
+    const items = incoming.items.map((row) => {
+      const prior = existing.get(row.id);
+      return prior && this.sameRow(prior, row) ? prior : row;
+    });
+    const unchanged = current.page === incoming.page && current.pageSize === incoming.pageSize && current.total === incoming.total && current.pages === incoming.pages && current.items.length === items.length && current.items.every((row, index) => row === items[index]);
+    return unchanged ? current : { ...incoming, items };
+  }
+
+  private sameRow(left: ChequeAnalyticsRow, right: ChequeAnalyticsRow): boolean {
+    return left.id === right.id && left.openedAt === right.openedAt && left.chequeNumber === right.chequeNumber && left.owner.name === right.owner.name && left.hallName === right.hallName && left.tableName === right.tableName && left.amountBeforeDiscount === right.amountBeforeDiscount && left.discountPercent === right.discountPercent && left.totalAmount === right.totalAmount && left.paymentMethod === right.paymentMethod && left.clientPaidAmount === right.clientPaidAmount && left.closedAt === right.closedAt && left.status === right.status;
+  }
+
+  private scrollPosition(): { top: number; left: number } | null {
+    const element = this.tableRows()?.nativeElement;
+    return element ? { top: element.scrollTop, left: element.scrollLeft } : null;
+  }
+
+  private restoreScrollPosition(position: { top: number; left: number }): void {
+    requestAnimationFrame(() => {
+      const element = this.tableRows()?.nativeElement;
+      if (element) { element.scrollTop = position.top; element.scrollLeft = position.left; }
     });
   }
 
