@@ -55,6 +55,7 @@ export class AdminApiService {
   deleteCategory(id:string):Observable<void>{return this.http.delete<void>(`${this.baseUrl}/admin/catalog/categories/${id}`,{headers:this.headers()});}
   getDishes(page=1,pageSize=20,search=''):Observable<DishPage>{return this.http.get<DishPage>(`${this.baseUrl}/admin/catalog/dishes`,{headers:this.headers(),params:{page,pageSize,search}});}
   createDish(value: { categoryId:string; translations:CatalogTranslations; imageUrl?:string; priceAmount:number; calories?:number; status?:string }):Observable<Dish>{return this.http.post<Dish>(`${this.baseUrl}/admin/catalog/dishes`,value,{headers:this.headers()});}
+  updateDish(id: string, value: { categoryId: string; translations: CatalogTranslations; imageUrl?: string; priceAmount: number; calories?: number; status?: string }): Observable<Dish> { return this.http.patch<Dish>(`${this.baseUrl}/admin/catalog/dishes/${id}`, value, { headers: this.headers() }); }
   uploadImage(file:File):Observable<{url:string}>{const data=new FormData();data.append('file',file);return this.http.post<{url:string}>(`${this.baseUrl}/admin/uploads`,data,{headers:this.headers()});}
   getChequeAnalytics(query: ChequeAnalyticsQuery): Observable<ChequeAnalyticsPage> {
     let params = new HttpParams();
