@@ -18,6 +18,9 @@ export interface CatalogTranslations { ka: { name: string; description?: string;
 export interface Category { id: string; imageUrl: string | null; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; sortOrder: number; translations: { languageCode: string; name: string }[]; }
 export interface Dish { id: string; categoryId: string; imageUrl: string | null; priceAmount: string|number; calories: number|null; status: 'AVAILABLE'|'PAUSED'|'HIDDEN'; translations: { languageCode: string; name: string; description: string; recipe?: string }[]; category?: Category; }
 export interface DishPage { items: Dish[]; page: number; pageSize: number; total: number; }
+export interface FloorMenu { id: string; translations: { languageCode: string; name: string }[]; }
+export interface ManagedTable { id: string; name: string; sortOrder: number; isActive: boolean; hasActiveCheque: boolean; }
+export interface ManagedHall { id: string; name: string; sortOrder: number; isActive: boolean; menuId: string | null; menu: FloorMenu | null; hasActiveCheque: boolean; tables: ManagedTable[]; }
 
 export type ChequeAnalyticsSortKey = 'openedAt' | 'chequeNumber' | 'owner' | 'hall' | 'table' | 'amount' | 'discountPercent' | 'total' | 'payment' | 'clientPaid' | 'closedAt';
 export type ChequeAnalyticsSort = { readonly key: ChequeAnalyticsSortKey; readonly direction: 'asc' | 'desc' };
@@ -39,6 +42,16 @@ export class AdminApiService {
   updateStaff(staffId: string, value: Partial<Staff> & { roleIds?: string[]; permissionCodes?: string[] }): Observable<Staff> { return this.http.patch<Staff>(`${this.baseUrl}/admin/staff/${staffId}`, value, { headers: this.headers() }); }
   deleteStaff(staffId: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/admin/staff/${staffId}`, { headers: this.headers() }); }
   resetPin(staffId: string, resend = false): Observable<PinResult> { return this.http.post<PinResult>(`${this.baseUrl}/admin/staff/${staffId}/pin/${resend ? 'resend' : 'reset'}`, {}, { headers: this.headers() }); }
+  getHalls(): Observable<ManagedHall[]> { return this.http.get<ManagedHall[]>(`${this.baseUrl}/admin/halls`, { headers: this.headers() }); }
+  getHallMenus(): Observable<FloorMenu[]> { return this.http.get<FloorMenu[]>(`${this.baseUrl}/admin/halls/menus`, { headers: this.headers() }); }
+  createHall(value: { name: string; menuId?: string | null; isActive?: boolean }): Observable<ManagedHall> { return this.http.post<ManagedHall>(`${this.baseUrl}/admin/halls`, value, { headers: this.headers() }); }
+  updateHall(hallId: string, value: { name: string; menuId?: string | null; isActive?: boolean }): Observable<ManagedHall> { return this.http.patch<ManagedHall>(`${this.baseUrl}/admin/halls/${hallId}`, value, { headers: this.headers() }); }
+  deleteHall(hallId: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/admin/halls/${hallId}`, { headers: this.headers() }); }
+  reorderHalls(ids: string[]): Observable<ManagedHall[]> { return this.http.put<ManagedHall[]>(`${this.baseUrl}/admin/halls/order`, { ids }, { headers: this.headers() }); }
+  createTable(hallId: string, value: { name: string; isActive?: boolean }): Observable<ManagedTable> { return this.http.post<ManagedTable>(`${this.baseUrl}/admin/halls/${hallId}/tables`, value, { headers: this.headers() }); }
+  updateTable(hallId: string, tableId: string, value: { name: string; isActive?: boolean }): Observable<ManagedTable> { return this.http.patch<ManagedTable>(`${this.baseUrl}/admin/halls/${hallId}/tables/${tableId}`, value, { headers: this.headers() }); }
+  deleteTable(hallId: string, tableId: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/admin/halls/${hallId}/tables/${tableId}`, { headers: this.headers() }); }
+  reorderTables(hallId: string, ids: string[]): Observable<ManagedHall[]> { return this.http.put<ManagedHall[]>(`${this.baseUrl}/admin/halls/${hallId}/tables/order`, { ids }, { headers: this.headers() }); }
   getPermissions(): Observable<Permission[]> { return this.http.get<Permission[]>(`${this.baseUrl}/admin/permissions`, { headers: this.headers() }); }
   getRoles(): Observable<Role[]> { return this.http.get<Role[]>(`${this.baseUrl}/admin/roles`, { headers: this.headers() }); }
   createRole(value: { name: string; description?: string; permissionCodes?: string[] }): Observable<Role> { return this.http.post<Role>(`${this.baseUrl}/admin/roles`, value, { headers: this.headers() }); }

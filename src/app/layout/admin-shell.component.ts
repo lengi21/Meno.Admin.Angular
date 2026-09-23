@@ -34,7 +34,7 @@ export class AdminShellComponent {
   readonly menuOpen = signal(false); readonly collapsed = signal(localStorage.getItem('meno-admin-sidebar') === 'collapsed');
   readonly kitchen: NavItem[] = [{ label: 'NAV.MENUS', route: '/menus', icon: 'restaurant_menu' }, { label: 'NAV.CATEGORIES', route: '/categories', icon: 'grid_view' }, { label: 'NAV.DISHES', route: '/dishes', icon: 'soup_kitchen' }];
   readonly analytics: NavItem[] = [{ label: 'NAV.ANALYTICS', route: '/analytics', icon: 'monitoring' }];
-  readonly management: NavItem[] = [{ label: 'NAV.STAFF', route: '/staff', icon: 'group' }, { label: 'NAV.ROLES', route: '/roles', icon: 'admin_panel_settings' }];
+  readonly management: NavItem[] = [{ label: 'NAV.HALLS', route: '/halls', icon: 'table_bar' }, { label: 'NAV.STAFF', route: '/staff', icon: 'group' }, { label: 'NAV.ROLES', route: '/roles', icon: 'admin_panel_settings' }];
   toggleSidebar() { this.collapsed.update(value => !value); localStorage.setItem('meno-admin-sidebar', this.collapsed() ? 'collapsed' : 'expanded'); }
   initials() { const user = this.auth.session()?.user; return user ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}` : '?'; }
   logout() { this.auth.signOut(); void this.router.navigateByUrl('/sign-in'); }

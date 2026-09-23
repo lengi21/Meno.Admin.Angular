@@ -10,6 +10,7 @@ export const routes: Routes = [
     { path: 'settings', loadComponent: () => import('./features/settings/settings.component').then((m) => m.SettingsComponent) },
     { path: 'staff', loadComponent: () => import('./features/staff/staff.component').then((m) => m.StaffComponent) },
     { path: 'roles', loadComponent: () => import('./features/roles/roles.component').then((m) => m.RolesComponent) },
+    { path: 'halls', loadComponent: () => import('./features/halls/halls.component').then((m) => m.HallsComponent) },
     { path: 'menus', loadComponent: () => import('./features/menus/menus.component').then((m) => m.MenusComponent) },
     { path: 'categories', loadComponent: () => import('./features/categories/categories.component').then((m) => m.CategoriesComponent) },
     { path: 'dishes', loadComponent: () => import('./features/dishes/dishes.component').then((m) => m.DishesComponent) },
