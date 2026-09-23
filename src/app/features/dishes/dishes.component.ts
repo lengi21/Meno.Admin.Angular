@@ -7,22 +7,24 @@ import { DataTableComponent } from '../../shared/data-table/data-table.component
 import { BottomSheetComponent } from '../../shared/bottom-sheet/bottom-sheet.component';
 import { emptyTranslations } from '../catalog/catalog-form.utils';
 import { LanguageService } from '../../core/i18n/language.service';
+import { ContextMenuAction, ContextMenuComponent } from '../../shared/context-menu/context-menu.component';
 
 type DishDraft = { categoryId: string; translations: CatalogTranslations; imageUrl: string; priceAmount: number; calories: number | null; status: 'AVAILABLE' | 'PAUSED' | 'HIDDEN' };
 const emptyDishDraft = (categoryId = ''): DishDraft => ({ categoryId, translations: emptyTranslations(), imageUrl: '', priceAmount: 0, calories: null, status: 'AVAILABLE' });
 
 @Component({
   selector: 'app-dishes',
-  imports: [FormsModule, MatIconModule, CatalogImageComponent, DataTableComponent, BottomSheetComponent],
+  imports: [FormsModule, MatIconModule, CatalogImageComponent, DataTableComponent, BottomSheetComponent, ContextMenuComponent],
   template: `
     <main class="page list-page">
       <section class="heading"><div><h1>{{ language.current() === 'ka' ? 'კერძები' : 'Dishes' }}</h1><p>{{ page().total }} {{ language.current() === 'ka' ? 'კერძი' : 'dishes' }}</p></div><button type="button" (click)="openCreate()"><mat-icon>add</mat-icon>{{ language.current() === 'ka' ? 'კერძის დამატება' : 'Add dish' }}</button></section>
       <app-data-table>
         <section data-table-filters class="filters"><label><mat-icon>search</mat-icon><input [(ngModel)]="search" (ngModelChange)="load(1)" [placeholder]="language.current() === 'ka' ? 'კერძის ძიება...' : 'Search dishes...'"></label><select [(ngModel)]="categoryFilter"><option value="">{{ language.current() === 'ka' ? 'ყველა კატ.' : 'All categories' }}</option>@for (category of categories(); track category.id) {<option [value]="category.id">{{ categoryName(category) }}</option>}</select><select [(ngModel)]="statusFilter"><option value="">{{ language.current() === 'ka' ? 'ყველა სტატ.' : 'All statuses' }}</option><option value="AVAILABLE">{{ language.current() === 'ka' ? 'აქტიური' : 'Active' }}</option><option value="PAUSED">{{ language.current() === 'ka' ? 'შეჩერებული' : 'Paused' }}</option><option value="HIDDEN">{{ language.current() === 'ka' ? 'დამალული' : 'Hidden' }}</option></select></section>
-        <section data-table-rows class="table"><div class="head"><span>{{ language.current() === 'ka' ? 'კერძი' : 'Dish' }}</span><span>{{ language.current() === 'ka' ? 'კატეგორია' : 'Category' }}</span><span>{{ language.current() === 'ka' ? 'ფასი' : 'Price' }}</span><span>{{ language.current() === 'ka' ? 'კალ.' : 'Cal.' }}</span><span>{{ language.current() === 'ka' ? 'სტ.' : 'Status' }}</span><span>{{ language.current() === 'ka' ? 'მენ.' : 'Menus' }}</span><span></span></div>@for (dish of filtered(); track dish.id) {<article><div class="dish"><app-catalog-image [src]="dish.imageUrl"/><span><strong>{{ dishName(dish) }}</strong><small>{{ englishName(dish) }}</small></span></div><span>{{ categoryName(dish.category!) }}</span><b>{{ dish.priceAmount }} ₾</b><span>{{ dish.calories ?? '—' }}</span><span><i [class.paused]="dish.status === 'PAUSED'" [class.hidden]="dish.status === 'HIDDEN'">{{ statusName(dish.status) }}</i></span><span>1</span><button class="more" type="button" [attr.aria-label]="language.current() === 'ka' ? 'კერძის რედაქტირება' : 'Edit dish'" (click)="openEdit(dish)"><mat-icon>edit</mat-icon></button></article>}@empty {<div class="empty">{{ language.current() === 'ka' ? 'კერძები ვერ მოიძებნა' : 'No dishes found' }}</div>}</section>
+        <section data-table-rows class="table"><div class="head"><span>{{ language.current() === 'ka' ? 'კერძი' : 'Dish' }}</span><span>{{ language.current() === 'ka' ? 'კატეგორია' : 'Category' }}</span><span>{{ language.current() === 'ka' ? 'ფასი' : 'Price' }}</span><span>{{ language.current() === 'ka' ? 'კალ.' : 'Cal.' }}</span><span>{{ language.current() === 'ka' ? 'სტ.' : 'Status' }}</span><span>{{ language.current() === 'ka' ? 'მენ.' : 'Menus' }}</span><span></span></div>@for (dish of filtered(); track dish.id) {<article><div class="dish"><app-catalog-image [src]="dish.imageUrl"/><span><strong>{{ dishName(dish) }}</strong><small>{{ englishName(dish) }}</small></span></div><span>{{ categoryName(dish.category!) }}</span><b>{{ dish.priceAmount }} ₾</b><span>{{ dish.calories ?? '—' }}</span><span><i [class.paused]="dish.status === 'PAUSED'" [class.hidden]="dish.status === 'HIDDEN'">{{ statusName(dish.status) }}</i></span><span>1</span><button class="more" type="button" [attr.aria-label]="language.current() === 'ka' ? 'კერძის რედაქტირება' : 'Edit dish'" (click)="openActions(dish, $event)"><mat-icon>more_vert</mat-icon></button></article>}@empty {<div class="empty">{{ language.current() === 'ka' ? 'კერძები ვერ მოიძებნა' : 'No dishes found' }}</div>}</section>
         <footer data-table-footer><span>{{ page().total }} {{ language.current() === 'ka' ? 'კერძი' : 'dishes' }} · {{ page().page }}/{{ pages() }}</span><label class="page-jump">{{ language.current() === 'ka' ? 'გვერდი' : 'Page' }} <input type="number" [ngModel]="page().page" (ngModelChange)="goToPage($event)" min="1" [max]="pages()"></label><button type="button" (click)="load(page().page - 1)" [disabled]="page().page === 1"><mat-icon>chevron_left</mat-icon></button><button type="button" (click)="load(page().page + 1)" [disabled]="page().page >= pages()"><mat-icon>chevron_right</mat-icon></button></footer>
       </app-data-table>
     </main>
+    <app-context-menu [open]="actionDish() !== null" [left]="actionPosition().x" [top]="actionPosition().y" [actions]="contextActions()" (selected)="runAction($event)" (closed)="closeActions()" />
     <app-bottom-sheet [open]="editorOpen()" [title]="editing() ? (language.current() === 'ka' ? 'კერძის რედაქტირება' : 'Edit dish') : (language.current() === 'ka' ? 'ახალი კერძი' : 'New dish')" eyebrow="KITCHEN & MENU" (closed)="closeEditor()">
       <form class="dish-form" (ngSubmit)="save()">
         <label>კატეგორია<select name="category" [(ngModel)]="form.categoryId">@for (category of categories(); track category.id) {<option [value]="category.id">{{ categoryName(category) }}</option>}</select></label>
@@ -44,10 +46,15 @@ export class DishesComponent {
   readonly editorOpen = signal(false);
   readonly editing = signal<Dish | null>(null);
   readonly saving = signal(false);
+  readonly actionDish = signal<Dish | null>(null); readonly actionPosition = signal({ x: 0, y: 0 });
   search = ''; categoryFilter = ''; statusFilter = '';
   form: DishDraft = emptyDishDraft();
 
   constructor() { this.api.getCategories().subscribe((categories) => { this.categories.set(categories); this.form.categoryId = categories[0]?.id ?? ''; }); this.load(); }
+  contextActions(): readonly ContextMenuAction[] { return [{ id: 'edit', label: this.language.current() === 'ka' ? 'რედაქტირება' : 'Edit dish', icon: 'edit' }]; }
+  openActions(dish: Dish, event: MouseEvent): void { event.stopPropagation(); this.actionDish.set(dish); this.actionPosition.set({ x: Math.max(8, Math.min(event.clientX - 165, window.innerWidth - 190)), y: Math.max(8, Math.min(event.clientY - 6, window.innerHeight - 60)) }); }
+  closeActions(): void { this.actionDish.set(null); }
+  runAction(action: string): void { const dish = this.actionDish(); if (action === 'edit' && dish) this.openEdit(dish); }
   openCreate(): void { this.editing.set(null); this.form = emptyDishDraft(this.categories()[0]?.id ?? ''); this.editorOpen.set(true); }
   openEdit(dish: Dish): void { this.editing.set(dish); this.form = { categoryId: dish.categoryId, imageUrl: dish.imageUrl ?? '', priceAmount: Number(dish.priceAmount), calories: dish.calories, status: dish.status, translations: { ka: this.translation(dish, 'ka'), en: this.translation(dish, 'en'), ru: this.translation(dish, 'ru') } }; this.editorOpen.set(true); }
   closeEditor(): void { this.editorOpen.set(false); this.editing.set(null); }

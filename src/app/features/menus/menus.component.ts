@@ -5,9 +5,10 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { forkJoin, switchMap } from 'rxjs';
 import { AdminApiService, Category, Dish, Menu, MenuStructure } from '../../core/api/admin-api.service';
 import { BottomSheetComponent } from '../../shared/bottom-sheet/bottom-sheet.component';
+import { ContextMenuAction, ContextMenuComponent } from '../../shared/context-menu/context-menu.component';
 
 @Component({
-  selector: 'app-menus', imports: [FormsModule, BottomSheetComponent, MatIconModule, TranslatePipe],
+  selector: 'app-menus', imports: [FormsModule, BottomSheetComponent, MatIconModule, TranslatePipe, ContextMenuComponent],
   template: `
     <main class="page">
       <section class="heading"><div><h1>{{ 'MENU.TITLE' | translate }}</h1><p>{{ 'MENU.SUBTITLE' | translate:{ count: menus().length, restaurant: 'Panda House' } }}</p></div><button class="add-button" type="button" (click)="openCreate()"><mat-icon>add</mat-icon>{{ 'MENU.ADD' | translate }}</button></section>
@@ -17,13 +18,14 @@ import { BottomSheetComponent } from '../../shared/bottom-sheet/bottom-sheet.com
             <div class="cover" [style.background-image]="cover(menu, index)">
               @if (menu.isDefault) {<span class="default-badge">★ {{ 'MENU.DEFAULT' | translate }}</span>}
               <span class="state-badge" [class.protected]="menu.isSystem">{{ menu.isSystem ? ('COMMON.PROTECTED' | translate) : (menu.status === 'ACTIVE' ? ('COMMON.ACTIVE' | translate) : ('COMMON.PAUSED' | translate)) }}</span>
-              <button class="more" type="button" aria-label="Manage menu" (click)="$event.stopPropagation(); open(menu)"><mat-icon>more_vert</mat-icon></button>
+              <button class="more" type="button" aria-label="Manage menu" (click)="openActions(menu, $event)"><mat-icon>more_vert</mat-icon></button>
             </div>
             <div class="card-body"><h2>{{ name(menu) }}</h2><p>{{ englishName(menu) }} · {{ russianName(menu) }}</p><footer><span><mat-icon>layers</mat-icon>{{ menu._count?.categories ?? 0 }} {{ 'MENU.CATEGORIES' | translate }}</span><span><mat-icon>restaurant</mat-icon>{{ menu._count?.dishes ?? 0 }} {{ 'MENU.DISHES' | translate }}</span><time><mat-icon>schedule</mat-icon>{{ date(menu) }}</time></footer></div>
           </article>
         } @empty {<div class="empty"><strong>{{ 'MENU.EMPTY' | translate }}</strong><p>{{ 'MENU.EMPTY_HINT' | translate }}</p></div>}
       </section>
     </main>
+    <app-context-menu [open]="actionMenu() !== null" [left]="actionPosition().x" [top]="actionPosition().y" [actions]="menuActions" (selected)="runAction($event)" (closed)="closeActions()" />
     <app-bottom-sheet [open]="sheetOpen()" [title]="sheetMode()==='create' ? 'ახალი მენიუ' : (selectedMenu()?.isSystem ? 'QR მენიუს შიგთავსი' : 'მენიუს შიგთავსი')" [eyebrow]="sheetMode()==='create' ? 'KITCHEN & MENU' : 'MENU SETUP'" (closed)="sheetOpen.set(false)">
       @if (sheetMode() === 'create') {
         <form class="create-form" (ngSubmit)="create()"><p>შეავსეთ მენიუს სახელები სამივე ენაზე. შემდგომ შეგიძლიათ დაამატოთ კატეგორიები და კერძები.</p><label>ქართული<input name="ka" required [(ngModel)]="names.ka" placeholder="მაგ: მთავარი მენიუ"></label><label>English<input name="en" required [(ngModel)]="names.en" placeholder="e.g. Main Menu"></label><label>Русский<input name="ru" required [(ngModel)]="names.ru" placeholder="например, Главное меню"></label><label class="check"><input name="default" type="checkbox" [(ngModel)]="isDefault"><span><b>ნაგულისხმევი მენიუ</b><small>გამოიყენება დარბაზში, რომელსაც მენიუ არ აქვს მინიჭებული.</small></span></label><footer><button class="secondary" type="button" (click)="sheetOpen.set(false)">გაუქმება</button><button type="submit">მენიუს დამატება</button></footer></form>
@@ -38,12 +40,17 @@ import { BottomSheetComponent } from '../../shared/bottom-sheet/bottom-sheet.com
 export class MenusComponent {
   private readonly api = inject(AdminApiService);
   readonly menus = signal<Menu[]>([]); readonly categories = signal<Category[]>([]); readonly dishes = signal<Dish[]>([]);
-  readonly selectedMenu = signal<Menu | null>(null); readonly sheetOpen = signal(false); readonly sheetMode = signal<'create' | 'content'>('create'); readonly saving = signal(false);
+  readonly selectedMenu = signal<Menu | null>(null);
+  readonly actionMenu = signal<Menu | null>(null); readonly actionPosition = signal({ x: 0, y: 0 });
+  readonly menuActions: readonly ContextMenuAction[] = [{ id: 'edit', label: 'მენიუს რედაქტირება', icon: 'edit' }]; readonly sheetOpen = signal(false); readonly sheetMode = signal<'create' | 'content'>('create'); readonly saving = signal(false);
   readonly selectedCategoryIds = signal<Record<string, boolean>>({}); readonly selectedDishIds = signal<Record<string, boolean>>({});
   readonly categoryOrder = signal<string[]>([]); readonly dishOrder = signal<Record<string, string[]>>({});
   names = { ka: '', en: '', ru: '' }; isDefault = false;
   constructor() { this.load(); }
   load() { this.api.getMenus().subscribe({ next: value => this.menus.set(value) }); }
+  openActions(menu: Menu, event: MouseEvent): void { event.stopPropagation(); this.actionMenu.set(menu); this.actionPosition.set({ x: Math.max(8, Math.min(event.clientX - 165, window.innerWidth - 190)), y: Math.max(8, Math.min(event.clientY - 6, window.innerHeight - 60)) }); }
+  closeActions(): void { this.actionMenu.set(null); }
+  runAction(action: string): void { const menu = this.actionMenu(); if (action === 'edit' && menu) this.open(menu); }
   openCreate() { this.names = { ka: '', en: '', ru: '' }; this.isDefault = false; this.sheetMode.set('create'); this.sheetOpen.set(true); }
   create() { if (!this.names.ka || !this.names.en || !this.names.ru) return; this.api.createMenu({ translations: { ka: { name: this.names.ka }, en: { name: this.names.en }, ru: { name: this.names.ru } }, isDefault: this.isDefault }).subscribe({ next: () => { this.sheetOpen.set(false); this.load(); } }); }
   open(menu: Menu) { forkJoin({ structure: this.api.getMenuStructure(menu.id), categories: this.api.getCategories(), dishes: this.api.getDishes(1, 100) }).subscribe({ next: ({ structure, categories, dishes }) => this.openEditor(menu, structure, categories, dishes.items) }); }

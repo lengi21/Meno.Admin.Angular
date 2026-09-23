@@ -1,207 +1,42 @@
 import { Component, inject, signal } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
 import { BottomSheetComponent } from '../../shared/bottom-sheet/bottom-sheet.component';
+import { ContextMenuAction, ContextMenuComponent } from '../../shared/context-menu/context-menu.component';
 import { AdminApiService, Staff } from '../../core/api/admin-api.service';
 import { DataTableComponent } from '../../shared/data-table/data-table.component';
+
+type StaffDraft = { firstName: string; lastName: string; email: string; phone: string; roleIds: string[]; isActive: boolean };
+const emptyStaff = (): StaffDraft => ({ firstName: '', lastName: '', email: '', phone: '', roleIds: [], isActive: true });
+
 @Component({
   selector: 'app-staff',
-  imports: [MatIconModule, FormsModule, DataTableComponent, BottomSheetComponent],
+  imports: [MatIconModule, FormsModule, DataTableComponent, BottomSheetComponent, ContextMenuComponent],
   template: `<main class="page list-page">
-    <section class="heading">
-      <div>
-        <h1>პერსონალი & PIN-ები</h1>
-        <p>{{ staff().length }} თანამშრომელი</p>
-      </div>
-      <button (click)="sheetOpen.set(true)"><mat-icon>add</mat-icon>თანამშრომლის დამატება</button>
-    </section>
-    <app-data-table
-      ><section data-table-filters class="filters">
-        <label><mat-icon>search</mat-icon><input placeholder="ძიება..." /></label
-        ><select>
-          <option>ყველა</option>
-        </select>
-      </section>
-      <section data-table-rows class="rows">
-        <div class="head">
-          <span>თანამშრომელი</span><span>როლები</span><span>სტ.</span><span>უწყ.</span
-          ><span>PIN</span><span></span>
-        </div>
-        @for (member of staff(); track member.id) {
-          <article [class.inactive]="!member.isActive">
-            <div class="person">
-              <b>{{ member.firstName[0] }}{{ member.lastName[0] }}</b
-              ><span
-                ><strong>{{ member.firstName }} {{ member.lastName }}</strong
-                ><small>{{ member.email || member.phone }}</small></span
-              >
-            </div>
-            <span class="roles">
-              @for (role of member.roles; track role.id) {
-                <i>{{ role.name }}</i>
-              }</span
-            ><span
-              ><em>{{ member.isActive ? 'აქტიური' : 'არააქტიური' }}</em></span
-            ><span>—</span><span>—</span
-            ><button (click)="reset(member.id)"><mat-icon>more_vert</mat-icon></button>
-          </article>
-        }
-      </section></app-data-table
-    >
-  </main><app-bottom-sheet [open]="sheetOpen()" title="ახალი თანამშრომელი" eyebrow="MANAGEMENT" (closed)="sheetOpen.set(false)"><form class="staff-form" (ngSubmit)="create()"><label>სახელი<input name="firstName" required [(ngModel)]="form.firstName"></label><label>გვარი<input name="lastName" required [(ngModel)]="form.lastName"></label><label>ელ-ფოსტა<input name="email" [(ngModel)]="form.email"></label><label>ტელეფონი<input name="phone" [(ngModel)]="form.phone"></label><label>როლები<select name="roles" multiple [(ngModel)]="form.roleIds">@for(role of roles();track role.id){<option [value]="role.id">{{role.name}}</option>}</select></label><footer><button type="button" (click)="sheetOpen.set(false)">გაუქმება</button><button type="submit">დამატება</button></footer></form></app-bottom-sheet>`,
+    <section class="heading"><div><h1>პერსონალი & PIN-ები</h1><p>{{ staff().length }} თანამშრომელი</p></div><button type="button" (click)="openCreate()"><mat-icon>add</mat-icon>თანამშრომლის დამატება</button></section>
+    <app-data-table><section data-table-filters class="filters"><label><mat-icon>search</mat-icon><input placeholder="ძიება..." /></label><select><option>ყველა</option></select></section>
+      <section data-table-rows class="rows"><div class="head"><span>თანამშრომელი</span><span>როლები</span><span>სტატუსი</span><span>უწყ.</span><span>PIN</span><span></span></div>
+        @for (member of staff(); track member.id) {<article [class.inactive]="!member.isActive"><div class="person"><b>{{ member.firstName[0] }}{{ member.lastName[0] }}</b><span><strong>{{ member.firstName }} {{ member.lastName }}</strong><small>{{ member.email || member.phone }}</small></span></div><span class="roles">@for (role of member.roles; track role.id) {<i>{{ role.name }}</i>}</span><span><em [class.disabled]="!member.isActive">{{ member.isActive ? 'აქტიური' : 'არააქტიური' }}</em></span><span>—</span><span>—</span><button class="actions" type="button" aria-label="Staff actions" (click)="openActions(member, $event)"><mat-icon>more_vert</mat-icon></button></article>}
+      </section></app-data-table>
+  </main>
+  <app-context-menu [open]="menuMember() !== null" [left]="menuPosition().x" [top]="menuPosition().y" [actions]="menuActions" (selected)="runAction($event)" (closed)="closeActions()" />
+  <app-bottom-sheet [open]="sheetOpen()" [title]="editing() ? 'თანამშრომლის რედაქტირება' : 'ახალი თანამშრომელი'" eyebrow="MANAGEMENT" (closed)="closeSheet()"><form class="staff-form" (ngSubmit)="save()"><label>სახელი<input name="firstName" required [(ngModel)]="form.firstName"></label><label>გვარი<input name="lastName" required [(ngModel)]="form.lastName"></label><label>ელ-ფოსტა<input name="email" [(ngModel)]="form.email"></label><label>ტელეფონი<input name="phone" [(ngModel)]="form.phone"></label><label>როლები<select name="roles" multiple [(ngModel)]="form.roleIds">@for(role of roles();track role.id){<option [value]="role.id">{{role.name}}</option>}</select></label><label class="active"><input name="active" type="checkbox" [(ngModel)]="form.isActive"> აქტიური თანამშრომელი</label><footer><button type="button" class="secondary" (click)="closeSheet()">გაუქმება</button><button type="submit">{{ editing() ? 'შენახვა' : 'დამატება' }}</button></footer></form></app-bottom-sheet>`,
   styles: `
-    .page {
-      min-height: calc(100dvh - 56px);
-      padding: 24px 30px;
-      background: var(--color-background);
-    }
-    .heading {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
-    .heading h1 {
-      margin: 0;
-      font-size: 29px;
-    }
-    .heading p {
-      margin: 3px 0;
-      color: var(--text-muted);
-    }
-    .heading button {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      height: 40px;
-      padding: 0 18px;
-      border: 0;
-      border-radius: 22px;
-      background: var(--color-secondary);
-      color: #fff;
-      font-weight: 800;
-    }
-    .filters {
-      display: flex;
-      gap: 15px;
-    }
-    .filters label {
-      display: flex;
-      align-items: center;
-      width: 320px;
-      height: 46px;
-      padding: 0 14px;
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      background: var(--surface-card);
-    }
-    .filters input {
-      width: 100%;
-      height: 100%;
-      margin-left: 7px;
-      border: 0;
-      outline: 0;
-      background: transparent;
-    }
-    .filters select {
-      height: 46px;
-      min-width: 120px;
-      padding: 0 14px;
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      background: var(--surface-card);
-    }
-    .head,
-    article {
-      display: grid;
-      grid-template-columns: 2.2fr 1.4fr 0.9fr 0.6fr 0.8fr 32px;
-      align-items: center;
-      min-height: 76px;
-      padding: 0 20px;
-      gap: 12px;
-    }
-    .head {
-      min-height: 52px;
-      background: var(--surface-muted);
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 800;
-    }
-    .head span:first-child {
-      padding-left: 58px;
-    }
-    article {
-      border-top: 1px solid var(--border);
-      color: var(--text-muted);
-    }
-    .person {
-      display: flex;
-      align-items: center;
-      gap: 13px;
-      color: var(--text-primary);
-    }
-    .person b {
-      display: grid;
-      width: 46px;
-      height: 46px;
-      place-items: center;
-      border-radius: 50%;
-      background: var(--surface-muted);
-      color: var(--color-primary);
-    }
-    .person strong,
-    .person small {
-      display: block;
-    }
-    .person small {
-      margin-top: 3px;
-      color: var(--text-muted);
-    }
-    .roles {
-      display: flex;
-      gap: 5px;
-      flex-wrap: wrap;
-    }
-    .roles i,
-    article em {
-      padding: 5px 10px;
-      border-radius: 13px;
-      background: var(--surface-muted);
-      font-size: 12px;
-      font-style: normal;
-    }
-    article em {
-      background: #91aaa0;
-      color: #00ae75;
-    }
-    article button {
-      border: 0;
-      background: transparent;
-      color: var(--text-muted);
-    }
-    .staff-form{display:grid;gap:12px}.staff-form label{display:grid;gap:5px;font-size:13px;font-weight:700}.staff-form input,.staff-form select{min-height:40px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-muted)}.staff-form select{height:90px}.staff-form footer{display:flex;justify-content:flex-end;gap:8px}.staff-form footer button{padding:10px 14px;border:0;border-radius:8px;background:var(--olive);color:#fff;font-weight:800}.staff-form footer button:first-child{background:var(--surface-muted);color:var(--text-primary)}
-    .inactive {
-      opacity: 0.55;
-    }
-  `,
+    .page{min-height:calc(100dvh - 56px);padding:24px 30px;background:var(--color-background)}.heading{display:flex;justify-content:space-between;margin-bottom:24px}.heading h1{margin:0;font-size:29px}.heading p{margin:3px 0;color:var(--text-muted)}.heading button{display:flex;align-items:center;gap:7px;height:40px;padding:0 18px;border:0;border-radius:22px;background:var(--color-secondary);color:#fff;font-weight:800}.filters{display:flex;gap:15px}.filters label{display:flex;align-items:center;width:320px;height:46px;padding:0 14px;border:1px solid var(--border);border-radius:24px;background:var(--surface-card)}.filters input{width:100%;height:100%;margin-left:7px;border:0;outline:0;background:transparent}.filters select{height:46px;min-width:120px;padding:0 14px;border:1px solid var(--border);border-radius:24px;background:var(--surface-card)}.head,article{display:grid;grid-template-columns:2.2fr 1.4fr .9fr .6fr .8fr 32px;align-items:center;min-height:76px;padding:0 20px;gap:12px}.head{min-height:52px;background:var(--surface-muted);color:var(--text-muted);font-size:13px;font-weight:800}.head span:first-child{padding-left:58px}article{border-top:1px solid var(--border);color:var(--text-muted)}.person{display:flex;align-items:center;gap:13px;color:var(--text-primary)}.person b{display:grid;width:46px;height:46px;place-items:center;border-radius:50%;background:var(--surface-muted);color:var(--color-primary)}.person strong,.person small{display:block}.person small{margin-top:3px;color:var(--text-muted)}.roles{display:flex;gap:5px;flex-wrap:wrap}.roles i,article em{padding:5px 10px;border-radius:13px;background:var(--surface-muted);font-size:12px;font-style:normal}.roles i{color:var(--text-primary)}article em{background:#dcebd8;color:#1f682d;font-weight:800;box-shadow:inset 0 0 0 1px #9bc391}article em.disabled{background:#f7dfdc;color:#9e332e;box-shadow:inset 0 0 0 1px #e8a39c}.actions{display:grid;width:32px;height:32px;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--text-muted);cursor:pointer}.actions:hover{background:var(--olive-soft);color:var(--olive)}.staff-form{display:grid;gap:12px}.staff-form label{display:grid;gap:5px;font-size:13px;font-weight:700}.staff-form input,.staff-form select{min-height:40px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-muted)}.staff-form select{height:90px}.staff-form .active{display:flex;align-items:center;gap:7px}.staff-form .active input{min-height:auto}.staff-form footer{display:flex;justify-content:flex-end;gap:8px}.staff-form footer button{padding:10px 14px;border:0;border-radius:8px;background:var(--olive);color:#fff;font-weight:800}.staff-form footer .secondary{background:var(--surface-muted);color:var(--text-primary)}.inactive{opacity:.65}`,
 })
 export class StaffComponent {
-  private api = inject(AdminApiService);
-  readonly staff = signal<Staff[]>([]); readonly roles = signal<any[]>([]); readonly sheetOpen = signal(false); form={firstName:'',lastName:'',email:'',phone:'',roleIds:[] as string[]};
-  constructor() {
-    this.load();
-  }
-  load() {
-    this.api.getStaff().subscribe((v) => this.staff.set(v)); this.api.getRoles().subscribe((v) => this.roles.set(v));
-  }
-  create(){if(!this.form.firstName||!this.form.lastName||(!this.form.email&&!this.form.phone))return;this.api.createStaff(this.form).subscribe(()=>{this.sheetOpen.set(false);this.form={firstName:'',lastName:'',email:'',phone:'',roleIds:[]};this.load()});}
-  reset(id: string) {
-    this.api.resetPin(id).subscribe();
-  }
+  private readonly api = inject(AdminApiService);
+  readonly staff = signal<Staff[]>([]); readonly roles = signal<any[]>([]); readonly sheetOpen = signal(false); readonly editing = signal<Staff | null>(null);
+  readonly menuMember = signal<Staff | null>(null); readonly menuPosition = signal({ x: 0, y: 0 });
+  readonly menuActions: readonly ContextMenuAction[] = [{ id: 'edit', label: 'რედაქტირება', icon: 'edit' }, { id: 'reset-pin', label: 'PIN-ის განახლება', icon: 'password' }];
+  form: StaffDraft = emptyStaff();
+  constructor() { this.load(); }
+  load(): void { this.api.getStaff().subscribe((v) => this.staff.set(v)); this.api.getRoles().subscribe((v) => this.roles.set(v)); }
+  openCreate(): void { this.editing.set(null); this.form = emptyStaff(); this.sheetOpen.set(true); }
+  openEdit(member: Staff): void { this.editing.set(member); this.form = { firstName: member.firstName, lastName: member.lastName, email: member.email ?? '', phone: member.phone ?? '', roleIds: member.roles.map((role) => role.id), isActive: member.isActive }; this.sheetOpen.set(true); }
+  closeSheet(): void { this.sheetOpen.set(false); this.editing.set(null); }
+  openActions(member: Staff, event: MouseEvent): void { event.stopPropagation(); this.menuMember.set(member); this.menuPosition.set({ x: Math.max(8, Math.min(event.clientX - 165, window.innerWidth - 190)), y: Math.max(8, Math.min(event.clientY - 6, window.innerHeight - 100)) }); }
+  closeActions(): void { this.menuMember.set(null); }
+  runAction(action: string): void { const member = this.menuMember(); if (!member) return; if (action === 'edit') this.openEdit(member); if (action === 'reset-pin') this.api.resetPin(member.id).subscribe(); }
+  save(): void { if (!this.form.firstName || !this.form.lastName || (!this.form.email && !this.form.phone)) return; const current = this.editing(); const value = { firstName: this.form.firstName, lastName: this.form.lastName, email: this.form.email || null, phone: this.form.phone || null, roleIds: this.form.roleIds, isActive: this.form.isActive }; if (current) { this.api.updateStaff(current.id, value).subscribe(() => { this.closeSheet(); this.load(); }); } else { this.api.createStaff({ ...value, email: value.email ?? undefined, phone: value.phone ?? undefined }).subscribe(() => { this.closeSheet(); this.load(); }); } }
 }
-
-
-
-
-
-
-
