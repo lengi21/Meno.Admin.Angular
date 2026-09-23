@@ -4,7 +4,11 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AdminAuthService } from '../auth/admin-auth.service';
 
-export interface PosSettings { restaurantId: string; serviceFeePercent: number; defaultLanguage: 'ka' | 'en' | 'ru'; businessDayStart: string; businessDayEnd: string; }
+export interface PaymentBank { name: string; iban?: string; cardEnabled?: boolean; transferEnabled?: boolean; }
+export interface SettingsMenu { id: string; isDefault: boolean; translations: { languageCode: string; name: string }[]; }
+export interface AdminPrinter { id: string; name: string; connection: 'USB'|'BLUETOOTH'|'NETWORK'; address: string|null; paperWidthMm: number; isActive: boolean; routes: { jobType: PrintJobType }[]; }
+export type PrintJobType = 'ORDER'|'ADVANCE_CHEQUE'|'CLOSE_CHEQUE'|'DAY_BALANCE'|'MODIFICATION';
+export interface PosSettings { restaurantId: string; serviceFeePercent: number; defaultLanguage: 'ka' | 'en' | 'ru'; businessDayStart: string; businessDayEnd: string; paymentBanks: PaymentBank[]; defaultMenuId: string|null; menus: SettingsMenu[]; }
 export interface Permission { code: string; description: string; }
 export interface Role { id: string; name: string; description: string | null; isOwnerRole: boolean; isActive: boolean; permissions: { permission: Permission }[]; }
 export interface Staff { id: string; firstName: string; lastName: string; email: string | null; phone: string | null; isActive: boolean; roles: { id: string; name: string }[]; directPermissions: { code: string; isGranted: boolean }[]; }
@@ -37,6 +41,10 @@ export class AdminApiService {
   private readonly baseUrl = environment.apiBaseUrl;
   getSettings(restaurantId: string): Observable<PosSettings> { return this.http.get<PosSettings>(`${this.baseUrl}/admin/settings/${restaurantId}`, { headers: this.headers() }); }
   updateSettings(restaurantId: string, value: Partial<PosSettings>): Observable<PosSettings> { return this.http.patch<PosSettings>(`${this.baseUrl}/admin/settings/${restaurantId}`, value, { headers: this.headers() }); }
+  getPrinters(): Observable<AdminPrinter[]> { return this.http.get<AdminPrinter[]>(`${this.baseUrl}/admin/printers`, { headers: this.headers() }); }
+  createPrinter(value: { name: string; connection: AdminPrinter['connection']; address?: string; paperWidthMm: number; routes: PrintJobType[] }): Observable<AdminPrinter> { return this.http.post<AdminPrinter>(`${this.baseUrl}/admin/printers`, value, { headers: this.headers() }); }
+  updatePrinter(id: string, value: { name: string; connection: AdminPrinter['connection']; address?: string; paperWidthMm: number; routes: PrintJobType[]; isActive?: boolean }): Observable<AdminPrinter> { return this.http.patch<AdminPrinter>(`${this.baseUrl}/admin/printers/${id}`, value, { headers: this.headers() }); }
+  disablePrinter(id: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/admin/printers/${id}`, { headers: this.headers() }); }
   getStaff(): Observable<Staff[]> { return this.http.get<Staff[]>(`${this.baseUrl}/admin/staff`, { headers: this.headers() }); }
   createStaff(value: { firstName: string; lastName: string; email?: string; phone?: string; roleIds?: string[]; permissionCodes?: string[] }): Observable<PinResult> { return this.http.post<PinResult>(`${this.baseUrl}/admin/staff`, value, { headers: this.headers() }); }
   updateStaff(staffId: string, value: Partial<Staff> & { roleIds?: string[]; permissionCodes?: string[] }): Observable<Staff> { return this.http.patch<Staff>(`${this.baseUrl}/admin/staff/${staffId}`, value, { headers: this.headers() }); }
