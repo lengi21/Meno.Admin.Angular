@@ -32,6 +32,10 @@ export interface ChequeAnalyticsQuery { readonly page?: number; readonly pageSiz
 export interface ChequeAnalyticsRow { readonly id: string; readonly openedAt: string; readonly chequeNumber: number; readonly owner: { readonly name: string }; readonly hallName: string; readonly tableName: string; readonly amountBeforeDiscount: number; readonly discountPercent: number; readonly totalAmount: number; readonly paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'SPLIT' | '—'; readonly clientPaidAmount: number; readonly closedAt: string | null; readonly status: string; }
 export interface ChequeAnalyticsPage { readonly items: readonly ChequeAnalyticsRow[]; readonly page: number; readonly pageSize: number; readonly total: number; readonly pages: number; }
 export interface ChequeAnalyticsFilters { readonly halls: readonly { readonly id: string; readonly name: string; readonly tables: readonly { readonly id: string; readonly name: string }[] }[]; readonly staff: readonly { readonly id: string; readonly name: string }[]; readonly businessDays: readonly { readonly id: string; readonly businessDate: string; readonly status: 'OPEN'|'CLOSED' }[]; readonly defaultBusinessDayId: string | null; }
+export interface SoldDishAnalyticsQuery { readonly businessDayId?: string; readonly from?: string; readonly to?: string; }
+export interface SoldDishAnalyticsRow { readonly businessDate: string; readonly dishId: string; readonly dishName: string; readonly quantity: number; readonly unitPrice: number; readonly grossAmount: number; readonly discountAmount: number; readonly serviceFeeAmount: number; readonly totalAmount: number; readonly vatRate: number; readonly vatAmount: number; readonly amountExcludingVat: number; }
+export interface SoldDishPayment { readonly businessDate: string; readonly cash: number; readonly card: number; readonly transfer: number; readonly total: number; }
+export interface SoldDishReport { readonly filters: { readonly businessDayId: string | null; readonly from: string | null; readonly to: string | null }; readonly items: readonly SoldDishAnalyticsRow[]; readonly payments: readonly SoldDishPayment[]; readonly summary: { readonly chequeCount: number; readonly subtotal: number; readonly discount: number; readonly serviceFee: number; readonly total: number; readonly vatRate: number; readonly vatAmount: number; readonly amountExcludingVat: number; }; }
 export interface AdvanceChequeSnapshot { readonly available: boolean; readonly chequeNumber: number; readonly printedAt?: string; readonly isLive?: boolean; readonly receipt?: { readonly restaurantName: string; readonly hallName: string; readonly tableName: string; readonly chequeNumber: number; readonly language: 'ka' | 'en' | 'ru'; readonly total: number; readonly items: readonly { readonly name: string; readonly quantity: number; readonly unitPrice: number }[]; }; }
 
 @Injectable({ providedIn: 'root' })
@@ -87,7 +91,19 @@ export class AdminApiService {
     if (query.sort?.length) params = params.set('sort', query.sort.map((sort) => `${sort.key}:${sort.direction}`).join(','));
     return this.http.get<ChequeAnalyticsPage>(`${this.baseUrl}/admin/analytics/cheques`, { headers: this.headers(), params });
   }
+  getSoldDishAnalytics(query: SoldDishAnalyticsQuery): Observable<SoldDishReport> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(query)) if (value) params = params.set(key, value);
+    return this.http.get<SoldDishReport>(`${this.baseUrl}/admin/analytics/sold-dishes`, { headers: this.headers(), params });
+  }
+  exportSoldDishAnalytics(query: SoldDishAnalyticsQuery): Observable<Blob> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(query)) if (value) params = params.set(key, value);
+    return this.http.get(`${this.baseUrl}/admin/analytics/sold-dishes/export`, { headers: this.headers(), params, responseType: 'blob' });
+  }
   getChequeAnalyticsFilters(): Observable<ChequeAnalyticsFilters> { return this.http.get<ChequeAnalyticsFilters>(`${this.baseUrl}/admin/analytics/cheques/filters`, { headers: this.headers() }); }
   getAdvanceChequeSnapshot(chequeId: string): Observable<AdvanceChequeSnapshot> { return this.http.get<AdvanceChequeSnapshot>(`${this.baseUrl}/admin/analytics/cheques/${chequeId}/advance-receipt`, { headers: this.headers() }); }
   private headers(): HttpHeaders { return new HttpHeaders({ Authorization: `Bearer ${this.auth.session()?.accessToken ?? ''}` }); }
 }
+
+

@@ -15,6 +15,7 @@ export const routes: Routes = [
     { path: 'categories', loadComponent: () => import('./features/categories/categories.component').then((m) => m.CategoriesComponent) },
     { path: 'dishes', loadComponent: () => import('./features/dishes/dishes.component').then((m) => m.DishesComponent) },
     { path: 'analytics', loadComponent: () => import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent) },
+    { path: 'analytics/sold-dishes', loadComponent: () => import('./features/sold-dishes/sold-dishes-report.component').then((m) => m.SoldDishesReportComponent) },
     { path: 'audit', loadComponent: () => import('./features/audit/audit.component').then((m) => m.AuditComponent) },
     { path: '', pathMatch: 'full', redirectTo: 'settings' },
   ] },
